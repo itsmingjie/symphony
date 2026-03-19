@@ -4,22 +4,38 @@ defmodule SymphonyElixir.Codex.DynamicToolTest do
   alias SymphonyElixir.Codex.DynamicTool
 
   test "tool_specs advertises the linear_graphql input contract" do
-    assert [
-             %{
-               "description" => description,
-               "inputSchema" => %{
-                 "properties" => %{
-                   "query" => _,
-                   "variables" => _
-                 },
-                 "required" => ["query"],
-                 "type" => "object"
+    specs = DynamicTool.tool_specs()
+    graphql_spec = Enum.find(specs, &(&1["name"] == "linear_graphql"))
+
+    assert %{
+             "description" => description,
+             "inputSchema" => %{
+               "properties" => %{
+                 "query" => _,
+                 "variables" => _
                },
-               "name" => "linear_graphql"
-             }
-           ] = DynamicTool.tool_specs()
+               "required" => ["query"],
+               "type" => "object"
+             },
+             "name" => "linear_graphql"
+           } = graphql_spec
 
     assert description =~ "Linear"
+  end
+
+  test "tool_specs advertises agent session tools" do
+    specs = DynamicTool.tool_specs()
+    tool_names = Enum.map(specs, & &1["name"])
+
+    assert "linear_agent_activity" in tool_names
+    assert "linear_agent_session_update" in tool_names
+
+    activity_spec = Enum.find(specs, &(&1["name"] == "linear_agent_activity"))
+    assert activity_spec["inputSchema"]["required"] == ["type"]
+    assert activity_spec["inputSchema"]["properties"]["type"]["enum"] == ["thought", "action", "response", "error", "elicitation"]
+
+    session_spec = Enum.find(specs, &(&1["name"] == "linear_agent_session_update"))
+    assert session_spec["inputSchema"]["properties"]["plan"]["type"] == "array"
   end
 
   test "unsupported tools return a failure payload with the supported tool list" do
@@ -27,12 +43,11 @@ defmodule SymphonyElixir.Codex.DynamicToolTest do
 
     assert response["success"] == false
 
-    assert Jason.decode!(response["output"]) == %{
-             "error" => %{
-               "message" => ~s(Unsupported dynamic tool: "not_a_real_tool".),
-               "supportedTools" => ["linear_graphql"]
-             }
-           }
+    decoded = Jason.decode!(response["output"])
+    assert decoded["error"]["message"] == ~s(Unsupported dynamic tool: "not_a_real_tool".)
+    assert "linear_graphql" in decoded["error"]["supportedTools"]
+    assert "linear_agent_activity" in decoded["error"]["supportedTools"]
+    assert "linear_agent_session_update" in decoded["error"]["supportedTools"]
 
     assert response["contentItems"] == [
              %{
@@ -253,11 +268,14 @@ defmodule SymphonyElixir.Codex.DynamicToolTest do
       DynamicTool.execute(
         "linear_graphql",
         %{"query" => "query Viewer { viewer { id } }"},
-        linear_client: fn _query, _variables, _opts -> {:error, {:linear_api_status, 503}} end
+        linear_client: fn _query, _variables, _opts ->
+          {:error, {:linear_api_status, 503, %{"errors" => [%{"message" => "Service unavailable"}]}}}
+        end
       )
 
     assert Jason.decode!(status_error["output"]) == %{
              "error" => %{
+               "body" => %{"errors" => [%{"message" => "Service unavailable"}]},
                "message" => "Linear GraphQL request failed with HTTP 503.",
                "status" => 503
              }

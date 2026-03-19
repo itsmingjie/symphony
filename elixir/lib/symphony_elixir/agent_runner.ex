@@ -5,7 +5,7 @@ defmodule SymphonyElixir.AgentRunner do
 
   require Logger
   alias SymphonyElixir.Codex.AppServer
-  alias SymphonyElixir.{Config, Linear.Issue, PromptBuilder, Tracker, Workspace}
+  alias SymphonyElixir.{Config, Linear.AgentSession, Linear.Issue, PromptBuilder, Tracker, Workspace}
 
   @type worker_host :: String.t() | nil
 
@@ -96,6 +96,10 @@ defmodule SymphonyElixir.AgentRunner do
     max_turns = Keyword.get(opts, :max_turns, Config.settings!().agent.max_turns)
     issue_state_fetcher = Keyword.get(opts, :issue_state_fetcher, &Tracker.fetch_issue_states_by_ids/1)
 
+    agent_session_id = resolve_or_create_agent_session(issue, opts)
+    opts = Keyword.put(opts, :agent_session_id, agent_session_id)
+    send_agent_session_info(codex_update_recipient, issue, agent_session_id)
+
     with {:ok, session} <- AppServer.start_session(workspace, worker_host: worker_host) do
       try do
         do_run_codex_turns(session, workspace, issue, codex_update_recipient, opts, issue_state_fetcher, 1, max_turns)
@@ -106,6 +110,7 @@ defmodule SymphonyElixir.AgentRunner do
   end
 
   defp do_run_codex_turns(app_session, workspace, issue, codex_update_recipient, opts, issue_state_fetcher, turn_number, max_turns) do
+    agent_session_id = Keyword.get(opts, :agent_session_id)
     prompt = build_turn_prompt(issue, opts, turn_number, max_turns)
 
     with {:ok, turn_session} <-
@@ -113,7 +118,8 @@ defmodule SymphonyElixir.AgentRunner do
              app_session,
              prompt,
              issue,
-             on_message: codex_message_handler(codex_update_recipient, issue)
+             on_message: codex_message_handler(codex_update_recipient, issue),
+             agent_session_id: agent_session_id
            ) do
       Logger.info("Completed agent run for #{issue_context(issue)} session_id=#{turn_session[:session_id]} workspace=#{workspace} turn=#{turn_number}/#{max_turns}")
 
@@ -154,11 +160,55 @@ defmodule SymphonyElixir.AgentRunner do
 
     - The previous Codex turn completed normally, but the Linear issue is still in an active state.
     - This is continuation turn ##{turn_number} of #{max_turns} for the current agent run.
-    - Resume from the current workspace and workpad state instead of restarting from scratch.
+    - Resume from the current workspace state instead of restarting from scratch.
     - The original task instructions and prior turn context are already present in this thread, so do not restate them before acting.
     - Focus on the remaining ticket work and do not end the turn while the issue stays active unless you are truly blocked.
+    - Do not emit activities about the continuation itself (e.g. "Resuming...", "Checking status..."). Only emit activities about task progress.
     """
   end
+
+  # --- Agent Sessions ---
+
+  defp resolve_or_create_agent_session(%Issue{} = issue, opts) do
+    case Keyword.get(opts, :agent_session_id) do
+      existing when is_binary(existing) ->
+        Logger.info("Reusing agent session for #{issue_context(issue)} agent_session_id=#{existing}")
+        existing
+
+      _ ->
+        create_agent_session(issue, opts)
+    end
+  end
+
+  defp create_agent_session(%Issue{id: issue_id} = issue, opts) when is_binary(issue_id) do
+    create_agent_session_fun = Keyword.get(opts, :create_agent_session_fun, &AgentSession.create_on_issue/1)
+
+    case create_agent_session_fun.(issue_id) do
+      {:ok, session_id} ->
+        Logger.info("Created agent session for #{issue_context(issue)} agent_session_id=#{session_id}")
+        session_id
+
+      {:error, reason} ->
+        Logger.warning(
+          "Failed to create agent session for #{issue_context(issue)} reason=#{inspect(reason)}; " <>
+            "continuing without agent session. Agent sessions require a Linear OAuth application token."
+        )
+
+        nil
+    end
+  end
+
+  defp create_agent_session(_issue, _opts), do: nil
+
+  defp send_agent_session_info(recipient, %Issue{id: issue_id}, agent_session_id)
+       when is_binary(issue_id) and is_pid(recipient) and is_binary(agent_session_id) do
+    send(recipient, {:worker_runtime_info, issue_id, %{agent_session_id: agent_session_id}})
+    :ok
+  end
+
+  defp send_agent_session_info(_recipient, _issue, _agent_session_id), do: :ok
+
+  # --- Issue state helpers ---
 
   defp continue_with_issue?(%Issue{id: issue_id} = issue, issue_state_fetcher) when is_binary(issue_id) do
     case issue_state_fetcher.([issue_id]) do

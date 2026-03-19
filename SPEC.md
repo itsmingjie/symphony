@@ -27,8 +27,8 @@ require stricter approvals or sandboxing.
 Important boundary:
 
 - Symphony is a scheduler/runner and tracker reader.
-- Ticket writes (state transitions, comments, PR links) are typically performed by the coding agent
-  using tools available in the workflow/runtime environment.
+- Ticket writes (state transitions, comments/activities, PR links) are typically performed by the
+  coding agent using tools available in the workflow/runtime environment.
 - A successful run may end at a workflow-defined handoff state (for example `Human Review`), not
   necessarily `Done`.
 
@@ -50,8 +50,8 @@ Important boundary:
 - Rich web UI or multi-tenant control plane.
 - Prescribing a specific dashboard or terminal UI implementation.
 - General-purpose workflow engine or distributed job scheduler.
-- Built-in business logic for how to edit tickets, PRs, or comments. (That logic lives in the
-  workflow prompt and agent tooling.)
+- Built-in business logic for how to edit tickets, PRs, or communicate on issues. (That logic lives
+  in the workflow prompt and agent tooling.)
 - Mandating strong sandbox controls beyond what the coding agent and host OS provide.
 - Mandating a single default approval, sandbox, or operator-confirmation posture for all
   implementations.
@@ -1221,8 +1221,8 @@ Orchestrator behavior on tracker errors:
 
 Symphony does not require first-class tracker write APIs in the orchestrator.
 
-- Ticket mutations (state transitions, comments, PR metadata) are typically handled by the coding
-  agent using tools defined by the workflow prompt.
+- Ticket mutations (state transitions, comments/activities, PR metadata) are typically handled by
+  the coding agent using tools defined by the workflow prompt.
 - The service remains a scheduler/runner and tracker reader.
 - Workflow-specific success often means "reached the next handoff state" (for example
   `Human Review`) rather than tracker terminal state `Done`.
@@ -2036,7 +2036,6 @@ Unless otherwise noted, Sections 17.1 through 17.7 are `Core Conformance`. Bulle
   - top-level GraphQL `errors` produce `success=false` while preserving the GraphQL body
   - invalid arguments, missing auth, and transport failures return structured failure payloads
   - unsupported tool names still fail without stalling the session
-
 ### 17.6 Observability
 
 - Validation failures are operator-visible
@@ -2108,8 +2107,8 @@ Use the same validation profiles as Section 17:
 - TODO: Persist retry queue and session metadata across process restarts.
 - TODO: Make observability settings configurable in workflow front matter without prescribing UI
   implementation details.
-- TODO: Add first-class tracker write APIs (comments/state transitions) in the orchestrator instead
-  of only via agent tools.
+- TODO: Add first-class tracker write APIs (activities/state transitions) in the orchestrator
+  instead of only via agent tools.
 - TODO: Add pluggable issue tracker adapters beyond Linear.
 
 ### 18.3 Operational Validation Before Production (Recommended)

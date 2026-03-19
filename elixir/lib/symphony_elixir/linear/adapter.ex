@@ -7,14 +7,6 @@ defmodule SymphonyElixir.Linear.Adapter do
 
   alias SymphonyElixir.Linear.Client
 
-  @create_comment_mutation """
-  mutation SymphonyCreateComment($issueId: String!, $body: String!) {
-    commentCreate(input: {issueId: $issueId, body: $body}) {
-      success
-    }
-  }
-  """
-
   @update_state_mutation """
   mutation SymphonyUpdateIssueState($issueId: String!, $stateId: String!) {
     issueUpdate(id: $issueId, input: {stateId: $stateId}) {
@@ -45,18 +37,6 @@ defmodule SymphonyElixir.Linear.Adapter do
 
   @spec fetch_issue_states_by_ids([String.t()]) :: {:ok, [term()]} | {:error, term()}
   def fetch_issue_states_by_ids(issue_ids), do: client_module().fetch_issue_states_by_ids(issue_ids)
-
-  @spec create_comment(String.t(), String.t()) :: :ok | {:error, term()}
-  def create_comment(issue_id, body) when is_binary(issue_id) and is_binary(body) do
-    with {:ok, response} <- client_module().graphql(@create_comment_mutation, %{issueId: issue_id, body: body}),
-         true <- get_in(response, ["data", "commentCreate", "success"]) == true do
-      :ok
-    else
-      false -> {:error, :comment_create_failed}
-      {:error, reason} -> {:error, reason}
-      _ -> {:error, :comment_create_failed}
-    end
-  end
 
   @spec update_issue_state(String.t(), String.t()) :: :ok | {:error, term()}
   def update_issue_state(issue_id, state_name)

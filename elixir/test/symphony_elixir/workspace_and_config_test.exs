@@ -432,7 +432,16 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
   test "linear client logs response bodies for non-200 graphql responses" do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        assert {:error, {:linear_api_status, 400}} =
+        assert {:error,
+                {:linear_api_status, 400,
+                 %{
+                   "errors" => [
+                     %{
+                       "message" => "Variable \"$ids\" got invalid value",
+                       "extensions" => %{"code" => "BAD_USER_INPUT"}
+                     }
+                   ]
+                 }}} =
                  Client.graphql(
                    "query Viewer { viewer { id } }",
                    %{},
@@ -456,6 +465,26 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     assert log =~ "Linear GraphQL request failed status=400"
     assert log =~ ~s(body=%{"errors" => [%{"extensions" => %{"code" => "BAD_USER_INPUT"})
     assert log =~ "Variable \\\"$ids\\\" got invalid value"
+  end
+
+  test "linear client sends oauth bearer authorization header" do
+    write_workflow_file!(Workflow.workflow_file_path(),
+      tracker_api_token: "oauth-access-token",
+      tracker_project_slug: "project",
+      codex_command: "/bin/sh app-server"
+    )
+
+    assert {:ok, %{"data" => %{"viewer" => %{"id" => "usr_123"}}}} =
+             Client.graphql(
+               "query Viewer { viewer { id } }",
+               %{},
+               request_fun: fn _payload, headers ->
+                 assert {"Authorization", "Bearer oauth-access-token"} in headers
+                 assert {"Content-Type", "application/json"} in headers
+
+                 {:ok, %{status: 200, body: %{"data" => %{"viewer" => %{"id" => "usr_123"}}}}}
+               end
+             )
   end
 
   test "orchestrator sorts dispatch by priority then oldest created_at" do
