@@ -103,6 +103,30 @@ defmodule SymphonyElixir.Linear.Client do
   }
   """
 
+  @project_query """
+  query SymphonyResolveProjectId($slug: String!) {
+    projects(filter: {slugId: {eq: $slug}}, first: 1) {
+      nodes {
+        id
+      }
+    }
+  }
+  """
+
+  @spec resolve_project_id(String.t()) :: {:ok, String.t()} | {:error, term()}
+  def resolve_project_id(project_slug) when is_binary(project_slug) do
+    case graphql(@project_query, %{slug: project_slug}) do
+      {:ok, %{"data" => %{"projects" => %{"nodes" => [%{"id" => id} | _]}}}} when is_binary(id) ->
+        {:ok, id}
+
+      {:ok, _body} ->
+        {:error, :project_not_found}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @spec fetch_candidate_issues() :: {:ok, [Issue.t()]} | {:error, term()}
   def fetch_candidate_issues do
     tracker = Config.settings!().tracker

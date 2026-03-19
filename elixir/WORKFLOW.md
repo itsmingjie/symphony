@@ -14,7 +14,7 @@ tracker:
     - Duplicate
     - Done
 polling:
-  interval_ms: 5000
+  interval_ms: 300000
 workspace:
   root: ~/code/symphony-workspaces
 hooks:
