@@ -47,6 +47,7 @@ defmodule SymphonyElixir.Config.Schema do
     embedded_schema do
       field(:kind, :string)
       field(:endpoint, :string, default: "https://api.linear.app/graphql")
+      field(:subscription_endpoint, :string)
       field(:api_key, :string)
       field(:project_slug, :string)
       field(:assignee, :string)
@@ -59,7 +60,7 @@ defmodule SymphonyElixir.Config.Schema do
       schema
       |> cast(
         attrs,
-        [:kind, :endpoint, :api_key, :project_slug, :assignee, :active_states, :terminal_states],
+        [:kind, :endpoint, :subscription_endpoint, :api_key, :project_slug, :assignee, :active_states, :terminal_states],
         empty_values: []
       )
     end
@@ -72,7 +73,7 @@ defmodule SymphonyElixir.Config.Schema do
 
     @primary_key false
     embedded_schema do
-      field(:interval_ms, :integer, default: 30_000)
+      field(:interval_ms, :integer, default: 300_000)
     end
 
     @spec changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()

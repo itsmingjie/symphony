@@ -103,6 +103,30 @@ defmodule SymphonyElixir.Linear.Client do
   }
   """
 
+  @project_query """
+  query SymphonyResolveProjectId($slug: String!) {
+    projects(filter: {slugId: {eq: $slug}}, first: 1) {
+      nodes {
+        id
+      }
+    }
+  }
+  """
+
+  @spec resolve_project_id(String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def resolve_project_id(project_slug, opts \\ []) when is_binary(project_slug) do
+    case graphql(@project_query, %{slug: project_slug}, opts) do
+      {:ok, %{"data" => %{"projects" => %{"nodes" => [%{"id" => id} | _]}}}} when is_binary(id) ->
+        {:ok, id}
+
+      {:ok, _body} ->
+        {:error, :project_not_found}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @spec fetch_candidate_issues() :: {:ok, [Issue.t()]} | {:error, term()}
   def fetch_candidate_issues do
     tracker = Config.settings!().tracker
@@ -164,7 +188,12 @@ defmodule SymphonyElixir.Linear.Client do
   def graphql(query, variables \\ %{}, opts \\ [])
       when is_binary(query) and is_map(variables) and is_list(opts) do
     payload = build_graphql_payload(query, variables, Keyword.get(opts, :operation_name))
-    request_fun = Keyword.get(opts, :request_fun, &post_graphql_request/2)
+
+    request_fun =
+      case Keyword.get(opts, :endpoint) do
+        nil -> Keyword.get(opts, :request_fun, &post_graphql_request/2)
+        endpoint -> Keyword.get(opts, :request_fun, &post_graphql_request(&1, &2, endpoint))
+      end
 
     with {:ok, headers} <- graphql_headers(),
          {:ok, %{status: 200, body: body}} <- request_fun.(payload, headers) do
@@ -395,7 +424,11 @@ defmodule SymphonyElixir.Linear.Client do
   end
 
   defp post_graphql_request(payload, headers) do
-    Req.post(Config.settings!().tracker.endpoint,
+    post_graphql_request(payload, headers, Config.settings!().tracker.endpoint)
+  end
+
+  defp post_graphql_request(payload, headers, endpoint) do
+    Req.post(endpoint,
       headers: headers,
       json: payload,
       connect_options: [timeout: 30_000]

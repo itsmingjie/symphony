@@ -363,6 +363,7 @@ defmodule SymphonyElixir.StatusDashboard do
              colorize(" | ", @ansi_gray) <>
              colorize("total #{format_count(codex_total_tokens)}", @ansi_yellow),
            colorize("│ Rate Limits: ", @ansi_bold) <> format_rate_limits(rate_limits),
+           format_subscription_status_line(),
            project_link_lines,
            project_refresh_line,
            colorize("├─ Running", @ansi_bold),
@@ -1059,6 +1060,21 @@ defmodule SymphonyElixir.StatusDashboard do
 
   defp normalize_status_lines(content) do
     content
+  end
+
+  defp format_subscription_status_line do
+    alias SymphonyElixir.Linear.Subscription
+
+    case Subscription.status() do
+      :connected ->
+        colorize("│ Subscription: ", @ansi_bold) <> colorize("● connected", @ansi_green)
+
+      :connecting ->
+        colorize("│ Subscription: ", @ansi_bold) <> colorize("● connecting…", @ansi_yellow)
+
+      :disconnected ->
+        colorize("│ Subscription: ", @ansi_bold) <> colorize("● off", @ansi_gray)
+    end
   end
 
   defp closing_border, do: "╰─"
