@@ -12,6 +12,7 @@ defmodule SymphonyElixir.Orchestrator do
 
   @continuation_retry_delay_ms 1_000
   @failure_retry_base_ms 10_000
+  @subscription_debounce_ms 2_000
   # Slightly above the dashboard render interval so "checking now…" can render.
   @poll_transition_render_delay_ms 20
   @empty_codex_totals %{
@@ -215,6 +216,16 @@ defmodule SymphonyElixir.Orchestrator do
   end
 
   def handle_info({:retry_issue, _issue_id}, state), do: {:noreply, state}
+
+  def handle_info(:linear_subscription_event, %State{poll_check_in_progress: true} = state) do
+    {:noreply, state}
+  end
+
+  def handle_info(:linear_subscription_event, %State{} = state) do
+    Logger.debug("Linear subscription event received, scheduling poll")
+    state = schedule_tick(state, @subscription_debounce_ms)
+    {:noreply, state}
+  end
 
   def handle_info(msg, state) do
     Logger.debug("Orchestrator ignored message: #{inspect(msg)}")

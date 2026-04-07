@@ -15,6 +15,8 @@ defmodule SymphonyElixir.MixProject do
         ignore_modules: [
           SymphonyElixir.Config,
           SymphonyElixir.Linear.Client,
+          SymphonyElixir.Linear.Subscription,
+          SymphonyElixir.Linear.SubscriptionSocket,
           SymphonyElixir.SpecsCheck,
           SymphonyElixir.Orchestrator,
           SymphonyElixir.Orchestrator.State,
@@ -70,6 +72,7 @@ defmodule SymphonyElixir.MixProject do
       {:phoenix_html, "~> 4.2"},
       {:phoenix_live_view, "~> 1.1.0"},
       {:req, "~> 0.5"},
+      {:websockex, "~> 0.4.3"},
       {:jason, "~> 1.4"},
       {:yaml_elixir, "~> 2.12"},
       {:solid, "~> 1.2"},
