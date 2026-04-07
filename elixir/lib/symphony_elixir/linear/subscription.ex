@@ -194,7 +194,7 @@ defmodule SymphonyElixir.Linear.SubscriptionSocket do
   def handle_connect(_conn, state) do
     Logger.info("Linear WebSocket connected")
     send(self(), :send_connection_init)
-    {:ok, state}
+    {:ok, %{state | reconnect_attempt: 0}}
   end
 
   @impl true
